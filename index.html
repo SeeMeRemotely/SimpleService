@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Service Communications</title>
+  <link rel="icon" type="image/png" href="images/favicon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Base ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-dark:    #0e0700;
+      --bg-mid:     #1c0f00;
+      --bg-card:    #251200;
+      --amber:      #ff8c00;
+      --amber-dim:  #c96800;
+      --neon:       #ff5500;
+      --neon-glow:  rgba(255, 85, 0, 0.55);
+      --neon-soft:  rgba(255, 140, 0, 0.25);
+      --brown:      #5a2e00;
+      --text:       #f0c060;
+      --text-dim:   #9a6830;
+      --text-muted: #5a3a10;
+      --white:      #fff8e7;
+      --green:      #39ff88;   /* optional accent */
+      --font-head:  'Orbitron', monospace;
+      --font-body:  'Share Tech Mono', monospace;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* ── Scanline overlay ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 3px,
+        rgba(0,0,0,0.18) 3px,
+        rgba(0,0,0,0.18) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Perspective grid background ── */
+    .grid-bg {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255,140,0,0.07) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,140,0,0.07) 1px, transparent 1px);
+      background-size: 40px 40px;
+      background-position: center center;
+      mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
+      pointer-events: none;
+    }
+
+    /* ── Neon glow helpers ── */
+    .neon-text {
+      color: var(--neon);
+      text-shadow: 0 0 8px var(--neon), 0 0 20px var(--neon-glow), 0 0 40px rgba(255,85,0,0.25);
+    }
+    .amber-text {
+      color: var(--amber);
+      text-shadow: 0 0 6px rgba(255,140,0,0.5);
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(14, 7, 0, 0.92);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--brown);
+      box-shadow: 0 2px 20px rgba(255,85,0,0.15);
+    }
+    .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+    .nav-logo img {
+      height: 44px;
+      display: block;
+    }
+    .nav-logo .logo-fallback {
+      font-family: var(--font-head);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--amber);
+      text-shadow: 0 0 8px rgba(255,140,0,0.6);
+      letter-spacing: 0.05em;
+      line-height: 1.25;
+      white-space: nowrap;
+    }
+    .nav-links {
+      display: flex;
+      gap: 28px;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      transition: color 0.2s, text-shadow 0.2s;
+    }
+    .nav-links a:hover {
+      color: var(--neon);
+      text-shadow: 0 0 8px var(--neon-glow);
+    }
+
+    /* ── Hero ── */
+    #hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 80px 24px;
+      overflow: hidden;
+      background: radial-gradient(ellipse 90% 60% at 50% 60%, #2a1200 0%, var(--bg-dark) 70%);
+    }
+    .hero-content { position: relative; z-index: 2; max-width: 780px; }
+
+    .hero-logo-wrap {
+      margin-bottom: 32px;
+    }
+    .hero-logo-wrap img {
+      max-width: 320px;
+      width: 100%;
+      filter: drop-shadow(0 0 16px rgba(255,140,0,0.5));
+    }
+    .hero-logo-wrap .logo-fallback-hero {
+      font-family: var(--font-head);
+      font-size: clamp(20px, 4vw, 28px);
+      font-weight: 900;
+      color: var(--amber);
+      text-shadow: 0 0 12px rgba(255,140,0,0.7), 0 0 30px rgba(255,85,0,0.3);
+      letter-spacing: 0.08em;
+      display: block;
+    }
+
+    .hero-tagline {
+      font-family: var(--font-head);
+      font-size: clamp(28px, 6vw, 56px);
+      font-weight: 900;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      color: var(--white);
+      text-shadow: 0 0 6px rgba(255,248,231,0.3);
+    }
+    .hero-tagline span { color: var(--neon); text-shadow: 0 0 10px var(--neon), 0 0 25px var(--neon-glow); }
+
+    .hero-sub {
+      font-size: 14px;
+      color: var(--text-dim);
+      max-width: 560px;
+      margin: 0 auto 40px;
+      letter-spacing: 0.04em;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 13px 32px;
+      font-family: var(--font-head);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      text-decoration: none;
+      border: 1px solid var(--neon);
+      color: var(--neon);
+      background: transparent;
+      cursor: pointer;
+      transition: all 0.25s;
+      box-shadow: 0 0 10px rgba(255,85,0,0.2), inset 0 0 0 rgba(255,85,0,0);
+    }
+    .btn:hover {
+      background: var(--neon);
+      color: var(--bg-dark);
+      box-shadow: 0 0 24px var(--neon-glow), 0 0 48px rgba(255,85,0,0.2);
+    }
+    .btn-amber {
+      border-color: var(--amber);
+      color: var(--amber);
+    }
+    .btn-amber:hover {
+      background: var(--amber);
+      color: var(--bg-dark);
+      box-shadow: 0 0 24px rgba(255,140,0,0.6);
+    }
+
+    /* ── Section shared ── */
+    section { padding: 90px 24px; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--neon);
+      text-shadow: 0 0 6px var(--neon-glow);
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-family: var(--font-head);
+      font-size: clamp(22px, 3.5vw, 36px);
+      font-weight: 700;
+      color: var(--white);
+      margin-bottom: 18px;
+      text-shadow: 0 0 4px rgba(255,248,231,0.2);
+    }
+    .section-body {
+      font-size: 14px;
+      color: var(--text-dim);
+      max-width: 620px;
+      line-height: 1.8;
+    }
+
+    /* Divider */
+    .divider {
+      border: none;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--brown), transparent);
+      margin: 0 auto;
+    }
+
+    /* ── Services ── */
+    #services { background: var(--bg-mid); }
+
+    .services-grid {
+      margin-top: 52px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .service-card {
+      background: var(--bg-card);
+      border: 1px solid var(--brown);
+      padding: 32px 28px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, box-shadow 0.25s;
+    }
+    .service-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--amber), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .service-card:hover {
+      border-color: var(--amber-dim);
+      box-shadow: 0 0 20px rgba(255,140,0,0.1);
+    }
+    .service-card:hover::before { opacity: 1; }
+
+    .service-icon {
+      font-size: 28px;
+      margin-bottom: 16px;
+      display: block;
+    }
+    .service-card h3 {
+      font-family: var(--font-head);
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--amber);
+      letter-spacing: 0.08em;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+    }
+    .service-card p {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.75;
+    }
+
+    /* ── Elderly Care Feature ── */
+    #care {
+      background: var(--bg-dark);
+      position: relative;
+      overflow: hidden;
+    }
+    #care .grid-bg { opacity: 0.5; }
+
+    .care-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: center;
+      margin-top: 20px;
+    }
+    @media (max-width: 700px) { .care-grid { grid-template-columns: 1fr; gap: 36px; } }
+
+    .care-list {
+      list-style: none;
+      margin-top: 24px;
+    }
+    .care-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(90,46,0,0.4);
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .care-list li::before {
+      content: '▸';
+      color: var(--neon);
+      text-shadow: 0 0 6px var(--neon-glow);
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .care-visual {
+      background: var(--bg-card);
+      border: 1px solid var(--brown);
+      padding: 36px;
+      text-align: center;
+      box-shadow: 0 0 40px rgba(255,85,0,0.08);
+    }
+    .care-visual .big-icon {
+      font-size: 72px;
+      display: block;
+      margin-bottom: 20px;
+      filter: drop-shadow(0 0 12px rgba(255,140,0,0.5));
+    }
+    .care-visual h4 {
+      font-family: var(--font-head);
+      font-size: 12px;
+      color: var(--amber);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .care-visual p {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.8;
+    }
+
+    /* ── About ── */
+    #about { background: var(--bg-mid); }
+    .about-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 60px;
+      align-items: start;
+    }
+    @media (max-width: 700px) { .about-inner { grid-template-columns: 1fr; } }
+
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 40px;
+    }
+    .stat-box {
+      background: var(--bg-dark);
+      border: 1px solid var(--brown);
+      padding: 20px 16px;
+      text-align: center;
+    }
+    .stat-box .num {
+      font-family: var(--font-head);
+      font-size: 26px;
+      font-weight: 900;
+      color: var(--neon);
+      text-shadow: 0 0 10px var(--neon-glow);
+      display: block;
+    }
+    .stat-box .lbl {
+      font-size: 10px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* ── Contact ── */
+    #contact {
+      background: var(--bg-dark);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 60px;
+      margin-top: 48px;
+      align-items: start;
+    }
+    @media (max-width: 800px) { .contact-grid { grid-template-columns: 1fr; } }
+
+    .contact-info p {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 28px;
+      line-height: 1.8;
+    }
+    .contact-detail {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .contact-detail .icon {
+      color: var(--neon);
+      text-shadow: 0 0 6px var(--neon-glow);
+      width: 20px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    /* Form */
+    .contact-form {
+      background: var(--bg-card);
+      border: 1px solid var(--brown);
+      padding: 36px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 500px) { .form-row { grid-template-columns: 1fr; } }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 7px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      background: var(--bg-dark);
+      border: 1px solid var(--brown);
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 13px;
+      padding: 10px 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--amber-dim);
+      box-shadow: 0 0 10px rgba(255,140,0,0.15);
+    }
+    .form-group textarea {
+      resize: vertical;
+      min-height: 120px;
+    }
+    .form-group select option { background: var(--bg-dark); }
+
+    .form-submit {
+      width: 100%;
+      padding: 15px;
+      font-family: var(--font-head);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      background: transparent;
+      border: 1px solid var(--neon);
+      color: var(--neon);
+      cursor: pointer;
+      transition: all 0.25s;
+      box-shadow: 0 0 8px rgba(255,85,0,0.1);
+    }
+    .form-submit:hover:not(:disabled) {
+      background: var(--neon);
+      color: var(--bg-dark);
+      box-shadow: 0 0 24px var(--neon-glow);
+    }
+    .form-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #form-status {
+      margin-top: 16px;
+      padding: 12px 16px;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      display: none;
+    }
+    #form-status.success {
+      display: block;
+      border: 1px solid var(--green);
+      color: var(--green);
+      text-shadow: 0 0 6px rgba(57,255,136,0.4);
+      background: rgba(57,255,136,0.05);
+    }
+    #form-status.error {
+      display: block;
+      border: 1px solid var(--neon);
+      color: var(--neon);
+      text-shadow: 0 0 6px var(--neon-glow);
+      background: rgba(255,85,0,0.05);
+    }
+
+    /* ── Footer ── */
+    footer {
+      background: #080400;
+      border-top: 1px solid var(--brown);
+      padding: 32px 24px;
+      text-align: center;
+    }
+    footer .footer-logo img {
+      height: 32px;
+      margin-bottom: 16px;
+      opacity: 0.7;
+    }
+    footer .footer-logo .logo-fallback {
+      font-family: var(--font-head);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+      display: block;
+      margin-bottom: 12px;
+    }
+    footer p {
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+    }
+    footer a { color: var(--text-muted); text-decoration: none; }
+    footer a:hover { color: var(--amber); }
+
+    /* ── Mobile nav ── */
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+    }
+
+    /* ── Utilities ── */
+    .mt-8  { margin-top: 8px; }
+    .mt-16 { margin-top: 16px; }
+    .mt-32 { margin-top: 32px; }
+  </style>
+</head>
+<body>
+
+  <!-- ██ NAV ██ -->
+  <nav>
+    <div class="nav-inner">
+      <a href="#hero" class="nav-logo">
+        <img src="images/logo-nav.png" alt="Simple Service Communications"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+        <span class="logo-fallback" style="display:none;">SIMPLE SERVICE<br>COMMUNICATIONS</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#services">Services</a></li>
+        <li><a href="#care">Elder Care</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- ██ HERO ██ -->
+  <section id="hero">
+    <div class="grid-bg"></div>
+    <div class="hero-content">
+
+      <div class="hero-logo-wrap">
+        <img src="images/logo-hero.png" alt="Simple Service Communications"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+        <span class="logo-fallback-hero" style="display:none;">SIMPLE SERVICE COMMUNICATIONS</span>
+      </div>
+
+      <h1 class="hero-tagline">
+        Tech support that<br/><span>actually shows up.</span>
+      </h1>
+      <p class="hero-sub">
+        Telecommunications, logistics, and IT peace-of-mind for small businesses —
+        and families caring for loved ones from a distance.
+      </p>
+      <a href="#contact" class="btn">Get In Touch</a>
+      &nbsp;&nbsp;
+      <a href="#services" class="btn btn-amber">Our Services</a>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ██ SERVICES ██ -->
+  <section id="services">
+    <div class="section-inner">
+      <p class="section-label">// What We Do</p>
+      <h2 class="section-title">Services Built for the Real World</h2>
+      <p class="section-body">
+        No dedicated IT department? No problem. We handle the complexity so you can focus
+        on running your business — or simply staying connected to the people you love.
+      </p>
+
+      <div class="services-grid">
+
+        <div class="service-card">
+          <span class="service-icon">📡</span>
+          <h3>Telecom Setup &amp; Support</h3>
+          <p>Phone systems, internet connectivity, and business line management. We configure, troubleshoot, and maintain — so your team stays online and reachable.</p>
+        </div>
+
+        <div class="service-card">
+          <span class="service-icon">🔧</span>
+          <h3>IT Logistics &amp; Coordination</h3>
+          <p>From vendor management to hardware procurement and network setup, we solve the behind-the-scenes headaches that slow small businesses down.</p>
+        </div>
+
+        <div class="service-card">
+          <span class="service-icon">💻</span>
+          <h3>Remote Monitoring &amp; Alerts</h3>
+          <p>Device health checks, uptime monitoring, and proactive alerts mean we catch problems before they become crises — with zero IT staff required on your end.</p>
+        </div>
+
+        <div class="service-card">
+          <span class="service-icon">👴</span>
+          <h3>Elderly Assistance Technology</h3>
+          <p>Check-in systems, emergency alert devices, and easy-to-use communication tools for seniors — with simple dashboards for family members monitoring from afar.</p>
+        </div>
+
+        <div class="service-card">
+          <span class="service-icon">☎️</span>
+          <h3>Personal Emergency Response</h3>
+          <p>PERS devices, medical alert systems, and fall detection solutions. We source, configure, and support the right equipment for every individual's needs.</p>
+        </div>
+
+        <div class="service-card">
+          <span class="service-icon">🤝</span>
+          <h3>Consulting &amp; Planning</h3>
+          <p>Not sure what you need? We start with a conversation. Our straightforward assessments help you understand your options without upsells or jargon.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ██ ELDER CARE ██ -->
+  <section id="care">
+    <div class="grid-bg"></div>
+    <div class="section-inner">
+      <p class="section-label">// Family First</p>
+      <h2 class="section-title">Keeping Loved Ones Safe &amp; Connected</h2>
+
+      <div class="care-grid">
+        <div>
+          <p class="section-body">
+            Distance shouldn't mean worry. We work with families to put the right
+            technology in place — giving seniors their independence while giving
+            their families real peace of mind.
+          </p>
+          <ul class="care-list">
+            <li>Fall detection and automatic emergency alerts</li>
+            <li>Daily check-in systems with family notifications</li>
+            <li>Easy video calling setup and ongoing support</li>
+            <li>Medication reminder devices and smart home integration</li>
+            <li>GPS location services for at-risk individuals</li>
+            <li>One-touch emergency buttons and wearable devices</li>
+            <li>Simplified tablet and phone configuration for seniors</li>
+            <li>Remote family monitoring dashboards</li>
+          </ul>
+          <div class="mt-32">
+            <a href="#contact" class="btn">Talk to Us About Care Solutions</a>
+          </div>
+        </div>
+
+        <div class="care-visual">
+          <span class="big-icon">🏠</span>
+          <h4>Stay Home. Stay Safe.</h4>
+          <p>
+            Most seniors prefer to age in place. Our solutions make that possible —
+            with a safety net that families can trust and seniors barely notice.
+            Simple to use. Always on. Always there.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ██ ABOUT ██ -->
+  <section id="about">
+    <div class="section-inner">
+      <div class="about-inner">
+        <div>
+          <p class="section-label">// About Us</p>
+          <h2 class="section-title">Small Business Focused. People Driven.</h2>
+          <p class="section-body">
+            Simple Service Communications was built for the businesses and families
+            that slip through the cracks of big telecom — too small for enterprise
+            contracts, too busy to figure it out alone.
+          </p>
+          <p class="section-body mt-16">
+            We speak plain English, show up when it matters, and don't disappear
+            after the sale. Whether you need a phone system for your office or
+            a check-in alert for your 84-year-old mother, we handle it the same way:
+            carefully and completely.
+          </p>
+        </div>
+        <div>
+          <div class="stat-row">
+            <div class="stat-box">
+              <span class="num">24/7</span>
+              <span class="lbl">Monitoring</span>
+            </div>
+            <div class="stat-box">
+              <span class="num">No IT</span>
+              <span class="lbl">Staff Needed</span>
+            </div>
+            <div class="stat-box">
+              <span class="num">100%</span>
+              <span class="lbl">US-Based</span>
+            </div>
+          </div>
+          <div class="care-visual mt-16" style="padding:24px 28px; text-align:left;">
+            <p style="font-size:13px; color:var(--text-dim); line-height:1.85;">
+              "We didn't know where to start when Dad started living alone after mom
+              passed. Simple Service walked us through everything — from the alert
+              button to the video call setup. Now we check in on him every morning
+              without either of us being stressed."
+            </p>
+            <p style="font-size:11px; color:var(--text-muted); margin-top:12px; letter-spacing:0.08em;">
+              — A FAMILY WE HELPED
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- ██ CONTACT ██ -->
+  <section id="contact">
+    <div class="grid-bg" style="opacity:0.4;"></div>
+    <div class="section-inner">
+      <p class="section-label">// Get In Touch</p>
+      <h2 class="section-title">Let's Start a Conversation</h2>
+
+      <div class="contact-grid">
+        <div class="contact-info">
+          <p>
+            No pressure, no jargon. Tell us what you're dealing with and
+            we'll let you know how we can help — usually within one business day.
+          </p>
+
+          <div class="contact-detail">
+            <span class="icon">📞</span>
+            <span>Phone: <a href="tel:+15555550100" style="color:var(--amber);">(555) 555-0100</a></span>
+          </div>
+          <div class="contact-detail">
+            <span class="icon">✉️</span>
+            <span>Email: <a href="mailto:hello@simpleservicecomm.com" style="color:var(--amber);">hello@simpleservicecomm.com</a></span>
+          </div>
+          <div class="contact-detail">
+            <span class="icon">🕐</span>
+            <span>Mon–Fri 8am–6pm · Sat 9am–2pm</span>
+          </div>
+
+          <p style="margin-top:28px; font-size:12px; color:var(--text-muted); line-height:1.8;">
+            Emergency support for active monitoring clients is available 24/7
+            through your monitoring dashboard or by calling our direct line.
+          </p>
+        </div>
+
+        <!-- SMTP2Go Contact Form -->
+        <div class="contact-form">
+          <form id="contactForm" novalidate>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="fname">First Name</label>
+                <input type="text" id="fname" name="fname" placeholder="Jane" required />
+              </div>
+              <div class="form-group">
+                <label for="lname">Last Name</label>
+                <input type="text" id="lname" name="lname" placeholder="Smith" required />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" placeholder="jane@example.com" required />
+              </div>
+              <div class="form-group">
+                <label for="phone">Phone (optional)</label>
+                <input type="tel" id="phone" name="phone" placeholder="(555) 555-0100" />
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="topic">I'm Interested In</label>
+              <select id="topic" name="topic" required>
+                <option value="" disabled selected>— Select a topic —</option>
+                <option value="Elderly / Family Care Solutions">Elderly / Family Care Solutions</option>
+                <option value="Telecom Setup or Support">Telecom Setup or Support</option>
+                <option value="IT Logistics for My Business">IT Logistics for My Business</option>
+                <option value="Remote Monitoring">Remote Monitoring</option>
+                <option value="Personal Emergency Response (PERS)">Personal Emergency Response (PERS)</option>
+                <option value="General Inquiry">General Inquiry</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="message">Tell Us More</label>
+              <textarea id="message" name="message" placeholder="Describe what you're looking for or the problem you're trying to solve..." required></textarea>
+            </div>
+
+            <button type="submit" class="form-submit" id="submitBtn">
+              Send Message
+            </button>
+
+            <div id="form-status"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ██ FOOTER ██ -->
+  <footer>
+    <div class="footer-logo">
+      <img src="images/logo-footer.png" alt="Simple Service Communications"
+           onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+      <span class="logo-fallback">SIMPLE SERVICE COMMUNICATIONS</span>
+    </div>
+    <p>
+      &copy; 2026 Simple Service Communications &nbsp;·&nbsp;
+      <a href="mailto:hello@simpleservicecomm.com">hello@simpleservicecomm.com</a>
+      &nbsp;·&nbsp; <a href="tel:+15555550100">(555) 555-0100</a>
+    </p>
+    <p style="margin-top:8px; font-size:10px; opacity:0.5; letter-spacing:0.1em;">
+      TELECOMMUNICATIONS · IT LOGISTICS · ELDERLY CARE TECHNOLOGY
+    </p>
+  </footer>
+
+  <!-- ██ SMTP2GO FORM SCRIPT ██ -->
+  <script>
+    /*
+     * ──────────────────────────────────────────────────────────────────────────
+     *  SMTP2GO CONFIGURATION
+     *  Replace the values below with your own SMTP2GO API key and email details.
+     *  Sign up free at https://www.smtp2go.com
+     * ──────────────────────────────────────────────────────────────────────────
+     */
+    const SMTP2GO_CONFIG = {
+      apiKey:    'YOUR_SMTP2GO_API_KEY',        // ← paste your API key here
+      sender:    'website@simpleservicecomm.com', // ← your verified sender address
+      recipient: 'hello@simpleservicecomm.com',   // ← where leads should land
+      senderName: 'Simple Service Communications Website'
+    };
+
+    document.getElementById('contactForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const btn    = document.getElementById('submitBtn');
+      const status = document.getElementById('form-status');
+
+      // Basic validation
+      const fname   = document.getElementById('fname').value.trim();
+      const lname   = document.getElementById('lname').value.trim();
+      const email   = document.getElementById('email').value.trim();
+      const phone   = document.getElementById('phone').value.trim();
+      const topic   = document.getElementById('topic').value;
+      const message = document.getElementById('message').value.trim();
+
+      if (!fname || !lname || !email || !topic || !message) {
+        status.className = 'error';
+        status.textContent = '▸ Please fill in all required fields.';
+        status.style.display = 'block';
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'TRANSMITTING...';
+      status.style.display = 'none';
+
+      const body = [
+        `Name:    ${fname} ${lname}`,
+        `Email:   ${email}`,
+        `Phone:   ${phone || 'Not provided'}`,
+        `Topic:   ${topic}`,
+        ``,
+        `Message:`,
+        message
+      ].join('\n');
+
+      const htmlBody = `
+        <div style="font-family:monospace; background:#0e0700; color:#f0c060; padding:24px; border:1px solid #5a2e00;">
+          <h2 style="color:#ff8c00; margin-bottom:16px;">New Contact Form Submission</h2>
+          <table style="border-collapse:collapse; width:100%;">
+            <tr><td style="padding:6px 16px 6px 0; color:#9a6830; white-space:nowrap;">Name</td><td style="padding:6px 0;">${fname} ${lname}</td></tr>
+            <tr><td style="padding:6px 16px 6px 0; color:#9a6830; white-space:nowrap;">Email</td><td style="padding:6px 0;"><a href="mailto:${email}" style="color:#ff8c00;">${email}</a></td></tr>
+            <tr><td style="padding:6px 16px 6px 0; color:#9a6830; white-space:nowrap;">Phone</td><td style="padding:6px 0;">${phone || 'Not provided'}</td></tr>
+            <tr><td style="padding:6px 16px 6px 0; color:#9a6830; white-space:nowrap;">Topic</td><td style="padding:6px 0;">${topic}</td></tr>
+          </table>
+          <hr style="border-color:#5a2e00; margin:16px 0;" />
+          <p style="color:#9a6830; margin-bottom:8px;">Message:</p>
+          <p style="color:#f0c060; white-space:pre-wrap;">${message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+        </div>`;
+
+      try {
+        const res = await fetch('https://api.smtp2go.com/v3/email/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key:  SMTP2GO_CONFIG.apiKey,
+            to:       [`${SMTP2GO_CONFIG.recipient}`],
+            sender:   `${SMTP2GO_CONFIG.senderName} <${SMTP2GO_CONFIG.sender}>`,
+            subject:  `[SSC Website] New inquiry — ${topic}`,
+            text_body: body,
+            html_body: htmlBody
+          })
+        });
+
+        const data = await res.json();
+
+        if (data.data && data.data.succeeded === 1) {
+          status.className = 'success';
+          status.textContent = '▸ Message sent. We\'ll be in touch within one business day.';
+          document.getElementById('contactForm').reset();
+        } else {
+          throw new Error(data.data?.error || 'Unexpected response');
+        }
+      } catch (err) {
+        status.className = 'error';
+        status.textContent = '▸ Something went wrong. Please email us directly at hello@simpleservicecomm.com';
+        console.error(err);
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Send Message';
+    });
+  </script>
+
+</body>
+</html>
