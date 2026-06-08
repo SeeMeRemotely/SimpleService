@@ -566,9 +566,63 @@
     footer a { color: var(--text-muted); text-decoration: none; }
     footer a:hover { color: var(--amber); }
 
+    /* ── Hamburger ── */
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 6px;
+    }
+    .hamburger span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      background: var(--amber);
+      border-radius: 2px;
+      transition: all 0.25s;
+      box-shadow: 0 0 6px rgba(255,140,0,0.5);
+    }
+    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
     /* ── Mobile nav ── */
     @media (max-width: 640px) {
-      .nav-links { display: none; }
+      .hamburger { display: flex; }
+      .nav-links {
+        display: none;
+        position: absolute;
+        top: 64px;
+        left: 0; right: 0;
+        background: rgba(14, 7, 0, 0.97);
+        border-bottom: 1px solid var(--brown);
+        flex-direction: column;
+        gap: 0;
+        padding: 8px 0;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+      }
+      .nav-links.open { display: flex; }
+      .nav-links a {
+        display: block;
+        padding: 14px 24px;
+        font-size: 12px;
+        border-bottom: 1px solid rgba(90,46,0,0.3);
+      }
+      .nav-links li:last-child a { border-bottom: none; }
+
+      /* Center hero buttons */
+      #hero { text-align: center; }
+      #hero .btn { display: inline-block; margin-bottom: 12px; }
+
+      /* Stat boxes: 1 col on very small, 3 col ok on wider mobile */
+      .stat-row { grid-template-columns: 1fr; gap: 10px; }
+    }
+
+    @media (min-width: 400px) and (max-width: 640px) {
+      .stat-row { grid-template-columns: repeat(3, 1fr); }
     }
 
     /* ── Utilities ── */
@@ -587,7 +641,10 @@
              onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
         <span class="logo-fallback" style="display:none;">SIMPLE SERVICE<br>COMMUNICATIONS</span>
       </a>
-      <ul class="nav-links">
+      <button class="hamburger" id="hamburger" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-links" id="navLinks">
         <li><a href="#services">Services</a></li>
         <li><a href="#care">Elder Care</a></li>
         <li><a href="#about">About</a></li>
@@ -878,6 +935,23 @@
       <a href="privacy.html">Privacy Policy</a> &nbsp;·&nbsp; <a href="terms.html">Terms &amp; Conditions</a>
     </p>
   </footer>
+
+  <!-- ██ MOBILE NAV ██ -->
+  <script>
+    const hamburger = document.getElementById('hamburger');
+    const navLinks  = document.getElementById('navLinks');
+    hamburger.addEventListener('click', () => {
+      hamburger.classList.toggle('open');
+      navLinks.classList.toggle('open');
+    });
+    // Close menu when a link is tapped
+    navLinks.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        hamburger.classList.remove('open');
+        navLinks.classList.remove('open');
+      });
+    });
+  </script>
 
   <!-- ██ SMTP2GO FORM SCRIPT ██ -->
   <script>
